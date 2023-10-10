@@ -63,9 +63,9 @@ public class QuickDiskUsagePlugin extends Plugin {
 
     private static final Logger logger = Logger.getLogger(QuickDiskUsagePlugin.class.getName());
 
-    private final CopyOnWriteArrayList<DiskItem> directoriesUsages = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<DiskItem2> directoriesUsages = new CopyOnWriteArrayList<>();
 
-    private final CopyOnWriteArrayList<JobDiskItem> jobsUsages = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<JobDiskItem2> jobsUsages = new CopyOnWriteArrayList<>();
 
     private long lastRunStart = 0;
 
@@ -98,14 +98,14 @@ public class QuickDiskUsagePlugin extends Plugin {
          singleExecutorService.execute(computeDiskUsageOnStartup);
     }
 
-    public CopyOnWriteArrayList<DiskItem> getDirectoriesUsages() throws IOException {
+    public CopyOnWriteArrayList<DiskItem2> getDirectoriesUsages() throws IOException {
         if (System.currentTimeMillis() - lastRunEnd >= QUIET_PERIOD) {
             refreshData();
         }
         return directoriesUsages;
     }
 
-    public CopyOnWriteArrayList<JobDiskItem> getJobsUsages() throws IOException {
+    public CopyOnWriteArrayList<JobDiskItem2> getJobsUsages() throws IOException {
         if (System.currentTimeMillis() - lastRunEnd >= QUIET_PERIOD) {
             refreshData();
         }
@@ -162,9 +162,13 @@ public class QuickDiskUsagePlugin extends Plugin {
             this.job = job;
         }
 
-        @Override
+        @Deprecated
         public void onCompleted(Path dir, long usage) {
-            JobDiskItem jobDiskItem = new JobDiskItem(job, usage / 1024);
+            onCompleted(dir, usage, 0);
+        }
+        @Override
+        public void onCompleted(Path dir, long usage, long count) {
+            JobDiskItem2 jobDiskItem = new JobDiskItem2(job, usage / 1024, count);
             jobsUsages.remove(jobDiskItem);
             jobsUsages.add(jobDiskItem);
             progress.incrementAndGet();
@@ -178,9 +182,12 @@ public class QuickDiskUsagePlugin extends Plugin {
             this.displayName = displayName;
         }
 
-        @Override
         public void onCompleted(Path dir, long usage) {
-            DiskItem diskItem = new DiskItem(displayName, dir.toFile(), usage / 1024);
+            onCompleted(dir, usage, 0);
+        }
+        @Override
+        public void onCompleted(Path dir, long usage, long count) {
+            DiskItem2 diskItem = new DiskItem2(displayName, dir.toFile(), usage / 1024, count);
             directoriesUsages.remove(diskItem);
             directoriesUsages.add(diskItem);
             progress.incrementAndGet();
@@ -191,7 +198,7 @@ public class QuickDiskUsagePlugin extends Plugin {
         Jenkins jenkins = Jenkins.get();
 
         // Remove useless entries for jobs
-        for (JobDiskItem item : jobsUsages) {
+        for (JobDiskItem2 item : jobsUsages) {
             if (!item.getPath().exists() || jenkins.getItemByFullName(item.getFullName(), Job.class) == null) {
                 jobsUsages.remove(item);
             }
@@ -251,7 +258,7 @@ public class QuickDiskUsagePlugin extends Plugin {
         directoriesToProcess.put(new File(System.getProperty("java.io.tmpdir")), "java.io.tmpdir");
 
         // Remove useless entries for directories
-        for (DiskItem item : directoriesUsages) {
+        for (DiskItem2 item : directoriesUsages) {
             if (!item.getPath().exists() || !directoriesToProcess.containsKey(item.getPath())) {
                 directoriesUsages.remove(item);
             }
